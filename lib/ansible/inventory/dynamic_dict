@@ -1,0 +1,50 @@
+# -*- coding: utf-8 -*-
+u"""This module defines the DynamicInventory object which takes a native
+    dictionary (eg. as returned by a Dynamic Inventory script) and converts it
+    to an "Inventory" object.
+
+    This is useful for Python code which needs an Inventory object to pass to
+    ansible's Runner or Playbook constructors, but already has that information
+    and doesn't want to - or is unable to - let Ansible call an external script to
+    fetch that information.
+    """
+from ansible.inventory import Host, Inventory
+from ansible.inventory.group import Group
+
+
+class DynamicInventory(Inventory):
+    u"""Creates an Inventory object from Dynamic information."""
+
+    def __init__(self, inventory):
+        u"""Create an inventory object based upon the given Dynamic
+            Inventory structure.
+            """
+        # Required for pattern matching:
+        group_all = Group('all')
+        self.groups = [group_all]
+        self._pattern_cache = {}
+        self._groups_list = {}
+
+        # Create the hosts cache.
+        self._hosts_cache = {}
+
+        for hostname, info in inventory["_meta"]["hostvars"].items():
+            host_obj = Host(hostname, info['ansible_ssh_port'])
+
+            for key, value in info.items():
+                if key != 'ansible_ssh_port':
+                    host_obj.set_variable(key, value)
+
+            self._hosts_cache[hostname] = host_obj
+            group_all.add_host(host_obj)
+
+        # Ignore --limit arguments.
+        self._subset = None
+
+        # Ignore these for some reason.
+        self._also_restriction = None
+        self._restriction = None
+
+    def is_file(self):
+        u"""This is not a file."""
+        return False
